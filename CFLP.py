@@ -39,7 +39,7 @@ def flp(I,J,d,M,c,existing_sites=None):
 # %%
 
 # for I, d make a dictionary of planning units to number of students
-pu_data = gpd.read_file('GIS_files/pu_with_proj.geojson').set_index('pu_2324_84')
+pu_data = gpd.read_file('/Users/leahwallihan/Durham_school_planning/DPS-Planning/GIS_files/pu_with_proj_SPLIT.geojson').set_index('pu_2324_84')
 pu_data = pu_data['final_proj'].to_dict()
 
 I, d = multidict(pu_data)
@@ -48,7 +48,7 @@ I, d = multidict(pu_data)
 # for J, M make a dictionary of sites to capacities
 schools = gpd.read_file('/Users/leahwallihan/Durham_school_planning/DPS-Planning/GIS_files/dps_hs_locations.geojson')
 schools = schools.to_crs('EPSG:4326')
-pu = gpd.read_file('/Users/leahwallihan/Durham_school_planning/geospatial files/pu_shape.geojson')
+pu = gpd.read_file('/Users/leahwallihan/Durham_school_planning/geospatial files/pu_shape_new.geojson')
 pu = pu.to_crs('EPSG:4326')
 
 for i, geometry in enumerate(pu['geometry']):
