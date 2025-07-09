@@ -10,7 +10,7 @@
 # In[3]:
 
 
-pip install geopy
+#pip install geopy
 
 
 # In[2]:
@@ -65,7 +65,7 @@ def flp(I,J,d,M,c,existing_sites=None):
 
 
 # for I, d make a dictionary of planning units to number of students
-pu = gpd.read_file('/Users/leahwallihan/Durham_school_planning/DPS-Planning/GIS_files/hs_full_geo.geojson').set_index('pu_2324_84')
+pu = gpd.read_file('/hpc/group/dataplus/lnw20/CFLP_infiles/hs_full_geo.geojson').set_index('pu_2324_84')
 pu = pu.to_crs('EPSG:4326')
 
 
@@ -91,7 +91,7 @@ I, d = multidict(pu_data)
 
 
 # for J, M make a dictionary of sites to capacities
-schools = gpd.read_file('/Users/leahwallihan/Durham_school_planning/DPS-Planning/GIS_files/dps_hs_locations.geojson')
+schools = gpd.read_file('/hpc/group/dataplus/lnw20/CFLP_infiles/dps_hs_locations.geojson')
 schools = schools.to_crs('EPSG:4326')
 
 # find which planning units have existing school
@@ -245,9 +245,6 @@ for solution in solution_reports:
 
 with open('CFLP_hs_noSGR.json', 'w') as f:
     json.dump(solution_reports, f)
-
-
-# In[ ]:
 
 
 
