@@ -1,3 +1,19 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[2]:
+
+
+#pip install pyscipopt
+
+
+# In[3]:
+
+
+#pip install geopy
+
+
+# In[2]:
 
 
 from pyscipopt import Model, quicksum, multidict
@@ -9,7 +25,7 @@ import json
 from geopy.distance import geodesic
 import sys
 
-sys.stdout = open("CFLP_halfSGR_output.log", "w")
+sys.stdout = open("CFLP_fullSGR_output.log", "w")
 sys.stderr = sys.stdout
 
 
@@ -27,7 +43,7 @@ def flp(I,J,d,M,c,existing_sites=None):
     for i in I:
         model.addCons(quicksum(x[i,j] for j in J) == d[i], "Demand(%s)"%i)
     for j in M:
-        model.addCons(quicksum(x[i,j] for i in I) <= M[j]*y[j]*1.05, "Capacity(%s)"%i)
+        model.addCons(quicksum(x[i,j] for i in I) <= M[j]*y[j]*1.1, "Capacity{j}") # ensures no school has capacity over 110%
         model.addCons(quicksum(x[i,j] for i in I) >= 0.7 * M[j] * y[j], "MinCapacityUse(%s)"%j) # ensures no school has capacity under 70%
     for (i,j) in x:
         model.addCons(x[i,j] <= d[i]*y[j], "Strong(%s,%s)"%(i,j))
@@ -64,10 +80,10 @@ pu = pu.to_crs('EPSG:4326')
 
 
 # for model with half SGRs:
-pu_half_SGR = pu.copy()
-pu_half_SGR['basez+gen'] = pu['basez'] + 0.15*pu['student_gen']
+pu_full_SGR = pu.copy()
+pu_full_SGR['basez+gen'] = pu['basez'] + 0.3*pu['student_gen']
 
-pu_data = pu_half_SGR['basez+gen'].to_dict()
+pu_data = pu_full_SGR['basez+gen'].to_dict()
 I, d = multidict(pu_data)
 
 
@@ -216,12 +232,12 @@ for solution in solution_reports:
 
     pu_new['assignment'] = pu.index.map(pu_to_facility)
     solution_number = solution['solution_number']
-    pu_new.to_file(f"CFLP_hs_halfSGR{solution_number}.geojson", driver="GeoJSON")
+    pu_new.to_file(f"CFLP_hs_fullSGR{solution_number}.geojson", driver="GeoJSON")
 
 
 # In[94]:
 
 
-with open('CFLP_hs_halfSGR.json', 'w') as f:
+with open('CFLP_hs_fullSGR.json', 'w') as f:
     json.dump(solution_reports, f)
 

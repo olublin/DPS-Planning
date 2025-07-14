@@ -1,3 +1,19 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[2]:
+
+
+#pip install pyscipopt
+
+
+# In[3]:
+
+
+#pip install geopy
+
+
+# In[2]:
 
 
 from pyscipopt import Model, quicksum, multidict
@@ -9,7 +25,7 @@ import json
 from geopy.distance import geodesic
 import sys
 
-sys.stdout = open("CFLP_halfSGR_output.log", "w")
+sys.stdout = open("CFLP_DSAfullSGR_output.log", "w")
 sys.stderr = sys.stdout
 
 
@@ -27,8 +43,8 @@ def flp(I,J,d,M,c,existing_sites=None):
     for i in I:
         model.addCons(quicksum(x[i,j] for j in J) == d[i], "Demand(%s)"%i)
     for j in M:
-        model.addCons(quicksum(x[i,j] for i in I) <= M[j]*y[j]*1.05, "Capacity(%s)"%i)
-        model.addCons(quicksum(x[i,j] for i in I) >= 0.7 * M[j] * y[j], "MinCapacityUse(%s)"%j) # ensures no school has capacity under 70%
+        model.addCons(quicksum(x[i,j] for i in I) <= M[j]*y[j]*1.1, "Capacity(%s)"%i)
+        model.addCons(quicksum(x[i,j] for i in I) >= 0.6 * M[j] * y[j], "MinCapacityUse(%s)"%j) # ensures no school has capacity under 60%
     for (i,j) in x:
         model.addCons(x[i,j] <= d[i]*y[j], "Strong(%s,%s)"%(i,j))
     
@@ -36,7 +52,7 @@ def flp(I,J,d,M,c,existing_sites=None):
         for j in existing_sites:
             model.addCons(y[j] == 1, name=f"ForceOpen({j})")
 
-    model.addCons(quicksum(y[j] for j in J) <= 6, "FacilityLimit") 
+    model.addCons(quicksum(y[j] for j in J) <= 7, "FacilityLimit") 
             
     model.setObjective(
         quicksum(c[i,j]*x[i,j] for i in I for j in J),
@@ -102,14 +118,15 @@ for idx, row in not_central.iterrows():
 # replace capacities of planning units with existing schools
 pu_dict[45] = 1400
 pu_dict[507] = 1510
-pu_dict[602] = 1340 # reduce by 300 for choice?
+pu_dict[602] = 1340 
 pu_dict[566] = 1240
-pu_dict[290] = 1335 # reduce by 300 for choice?
+pu_dict[290] = 1335 
+pu_dict[584] = 450 # include new DSA with capacity 500 for base students
 
 J, M = multidict(pu_dict)
 
 # define which sites already exist
-existing_sites = {602, 290, 45, 566, 507}
+existing_sites = {602, 290, 45, 566, 507, 584}
 
 
 # In[16]:
@@ -199,6 +216,11 @@ for report in solution_reports:
         print(f"  Facility {fac}: {count} students")
 
 
+# In[80]:
+
+
+
+
 
 # In[88]:
 
@@ -216,12 +238,18 @@ for solution in solution_reports:
 
     pu_new['assignment'] = pu.index.map(pu_to_facility)
     solution_number = solution['solution_number']
-    pu_new.to_file(f"CFLP_hs_halfSGR{solution_number}.geojson", driver="GeoJSON")
+    pu_new.to_file(f"CFLP_wDSA_fullSGR{solution_number}.geojson", driver="GeoJSON")
 
 
 # In[94]:
 
 
-with open('CFLP_hs_halfSGR.json', 'w') as f:
+with open('CFLP_wDSA_fullSGR.json', 'w') as f:
     json.dump(solution_reports, f)
+
+
+
+
+
+
 

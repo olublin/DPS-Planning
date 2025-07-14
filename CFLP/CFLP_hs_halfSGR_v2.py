@@ -1,5 +1,3 @@
-
-
 from pyscipopt import Model, quicksum, multidict
 import numpy as np
 import pandas as pd
@@ -8,13 +6,10 @@ import random
 import json
 from geopy.distance import geodesic
 import sys
+from pyscipopt import SCIP_PARAMEMPHASIS, SCIP_PARAMSETTING
 
-sys.stdout = open("CFLP_halfSGR_output.log", "w")
+sys.stdout = open("CFLP_halfSGR_output_v2.log", "w")
 sys.stderr = sys.stdout
-
-
-# In[4]:
-
 
 # adapted from https://scipbook.readthedocs.io/en/latest/flp.html
 def flp(I,J,d,M,c,existing_sites=None):
@@ -27,10 +22,11 @@ def flp(I,J,d,M,c,existing_sites=None):
     for i in I:
         model.addCons(quicksum(x[i,j] for j in J) == d[i], "Demand(%s)"%i)
     for j in M:
-        model.addCons(quicksum(x[i,j] for i in I) <= M[j]*y[j]*1.05, "Capacity(%s)"%i)
+        model.addCons(quicksum(x[i,j] for i in I) <= M[j]*y[j]*1.05, "Capacity(%s)"%i) # ensures capacity does not exceed 105%
         model.addCons(quicksum(x[i,j] for i in I) >= 0.7 * M[j] * y[j], "MinCapacityUse(%s)"%j) # ensures no school has capacity under 70%
     for (i,j) in x:
-        model.addCons(x[i,j] <= d[i]*y[j], "Strong(%s,%s)"%(i,j))
+        model.addCons(x[i,j] <= d[i]*y[j], "Strong(%s,%s)"%(i,j)) # previous strong constraint
+        #model.addCons(x[i,j] <= M[j]*y[j], "CapacityGate(%s,%s)"%(i,j)) # alternative to strong constraint
     
     if existing_sites:
         for j in existing_sites:
@@ -44,24 +40,12 @@ def flp(I,J,d,M,c,existing_sites=None):
     model.data = x,y
     return model
 
-
-# In[8]:
-
-
 # for I, d make a dictionary of planning units to number of students
 pu = gpd.read_file('/hpc/group/dataplus/lnw20/CFLP_infiles/hs_full_geo.geojson').set_index('pu_2324_84')
 pu = pu.to_crs('EPSG:4326')
 
-
-# In[7]:
-
-
 #pu_data = pu['basez'].to_dict()
 #I, d = multidict(pu_data)
-
-
-# In[10]:
-
 
 # for model with half SGRs:
 pu_half_SGR = pu.copy()
@@ -69,10 +53,6 @@ pu_half_SGR['basez+gen'] = pu['basez'] + 0.15*pu['student_gen']
 
 pu_data = pu_half_SGR['basez+gen'].to_dict()
 I, d = multidict(pu_data)
-
-
-# In[12]:
-
 
 # for J, M make a dictionary of sites to capacities
 schools = gpd.read_file('/hpc/group/dataplus/lnw20/CFLP_infiles/dps_hs_locations.geojson')
@@ -86,10 +66,6 @@ for i, geometry in enumerate(pu['geometry']):
     pu_id = pu.index[i]
 
     schools.loc[in_geometry, 'pu'] = pu_id
-
-
-# In[14]:
-
 
 # let's remove planning units in downtown from J to make problem simpler
 not_central = pu[(pu['Region'] != 'Central')]
@@ -111,10 +87,6 @@ J, M = multidict(pu_dict)
 # define which sites already exist
 existing_sites = {602, 290, 45, 566, 507}
 
-
-# In[16]:
-
-
 # Get centroids and convert to lat/lon tuples
 centroid_coords = {
     idx: (geom.y, geom.x)  # (latitude, longitude)
@@ -127,24 +99,21 @@ for i in I:
     for j in J:
         c[i, j] = geodesic(centroid_coords[i], centroid_coords[j]).miles
 
-
-
-# In[ ]:
-
-
 model = flp(I, J, d, M, c, existing_sites=existing_sites)
 model.setParam('limits/solutions', 5)
+model.setParam("presolving/maxrounds", 5)
+model.setEmphasis(SCIP_PARAMEMPHASIS.OPTIMALITY)
+model.setHeuristics(SCIP_PARAMSETTING.AGGRESSIVE)
+model.setParam("limits/gap", 0.01)
 model.optimize()
 EPS = 1.e-6
 x,y = model.data
 edges = [(i,j) for (i,j) in x if model.getVal(x[i,j]) > EPS]
 facilities = [j for j in y if model.getVal(y[j]) > EPS]
+
 print ("Optimal value=", model.getObjVal())
 print ("Facilities at nodes:", facilities)
 print ("Edges:", edges)
-
-
-# In[ ]:
 
 
 solution_reports = []
@@ -173,10 +142,6 @@ for sidx, sol in enumerate(sols):
         'student_count': student_count if 'students' in globals() else None
     })
 
-
-# In[118]:
-
-
 for report in solution_reports:
     print(f"\n--- Solution #{report['solution_number']} ---")
     print("Facilities opened:", report['facilities'])
@@ -199,10 +164,6 @@ for report in solution_reports:
         print(f"  Facility {fac}: {count} students")
 
 
-
-# In[88]:
-
-
 pu_new = pu.copy()
 
 for solution in solution_reports: 
@@ -216,12 +177,9 @@ for solution in solution_reports:
 
     pu_new['assignment'] = pu.index.map(pu_to_facility)
     solution_number = solution['solution_number']
-    pu_new.to_file(f"CFLP_hs_halfSGR{solution_number}.geojson", driver="GeoJSON")
+    pu_new.to_file(f"CFLP_hs_halfSGR_v2{solution_number}.geojson", driver="GeoJSON")
 
 
-# In[94]:
-
-
-with open('CFLP_hs_halfSGR.json', 'w') as f:
+with open('CFLP_hs_halfSGR_v2.json', 'w') as f:
     json.dump(solution_reports, f)
 
