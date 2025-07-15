@@ -25,8 +25,8 @@ def flp(I,J,d,M,c,existing_sites=None):
         model.addCons(quicksum(x[i,j] for i in I) <= M[j]*y[j]*1.05, "Capacity(%s)"%i) # ensures capacity does not exceed 105%
         model.addCons(quicksum(x[i,j] for i in I) >= 0.7 * M[j] * y[j], "MinCapacityUse(%s)"%j) # ensures no school has capacity under 70%
     for (i,j) in x:
-        model.addCons(x[i,j] <= d[i]*y[j], "Strong(%s,%s)"%(i,j)) # previous strong constraint
-        #model.addCons(x[i,j] <= M[j]*y[j], "CapacityGate(%s,%s)"%(i,j)) # alternative to strong constraint
+        #model.addCons(x[i,j] <= d[i]*y[j], "Strong(%s,%s)"%(i,j)) # previous strong constraint
+        model.addCons(x[i,j] <= 1e5 * y[j], "Strong(%s,%s)"%(i,j)) # alternative to strong constraint
     
     if existing_sites:
         for j in existing_sites:
@@ -111,6 +111,10 @@ EPS = 1.e-6
 x,y = model.data
 edges = [(i,j) for (i,j) in x if model.getVal(x[i,j]) > EPS]
 facilities = [j for j in y if model.getVal(y[j]) > EPS]
+
+for (i,j) in x:  # checks if any planning units assigned to closed facility
+    if model.getVal(x[i,j]) > 0 and model.getVal(y[j]) < 0.5:
+        print(f"WARNING: Assigned to closed facility {j}")
 
 print ("Optimal value=", model.getObjVal())
 print ("Facilities at nodes:", facilities)

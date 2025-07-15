@@ -14,6 +14,8 @@ sys.stderr = sys.stdout
 # adapted from https://scipbook.readthedocs.io/en/latest/flp.html
 def flp(I,J,d,M,c,existing_sites=None):
     model = Model("flp")
+    BIG_M = sum(d.values())
+
     x,y = {},{}
     for j in J:
         y[j] = model.addVar(vtype="B", name="y(%s)"%j)
@@ -25,8 +27,8 @@ def flp(I,J,d,M,c,existing_sites=None):
         model.addCons(quicksum(x[i,j] for i in I) <= M[j]*y[j]*1.05, "Capacity(%s)"%i) # ensures capacity does not exceed 105%
         model.addCons(quicksum(x[i,j] for i in I) >= 0.7 * M[j] * y[j], "MinCapacityUse(%s)"%j) # ensures no school has capacity under 70%
     for (i,j) in x:
-        model.addCons(x[i,j] <= d[i]*y[j], "Strong(%s,%s)"%(i,j)) # previous strong constraint
-        #model.addCons(x[i,j] <= M[j]*y[j], "CapacityGate(%s,%s)"%(i,j)) # alternative to strong constraint
+        #model.addCons(x[i,j] <= d[i]*y[j], "Strong(%s,%s)"%(i,j)) # previous strong constraint
+        model.addCons(x[i, j] <= BIG_M * y[j], f"Strong({i},{j})") # alternative to strong constraint
     
     if existing_sites:
         for j in existing_sites:
@@ -108,24 +110,22 @@ model.setParam("limits/gap", 0.01)
 model.optimize()
 EPS = 1.e-6
 x,y = model.data
-edges = [(i,j) for (i,j) in x if model.getVal(x[i,j]) > EPS]
-facilities = [j for j in y if model.getVal(y[j]) > EPS]
-
-print ("Optimal value=", model.getObjVal())
-print ("Facilities at nodes:", facilities)
-print ("Edges:", edges)
-
+print("Optimal value=", model.getObjVal())
 
 solution_reports = []
-
-# Get all stored solutions
 sols = model.getSols()
 
 for sidx, sol in enumerate(sols):
     assignments = {}
 
     for (i_, j_) in x:
-        if model.getSolVal(sol, x[i_, j_]) > 0.5:
+        x_val = model.getSolVal(sol, x[i_, j_])
+        y_val = model.getSolVal(sol, y[j_])
+
+        if x_val > 1e-4 and y_val < 0.5:
+            print(f"WARNING: PU {i} assigned {x_val:.2f} students to CLOSED facility {j}")
+
+        if x_val > 0.5:
             if j_ not in assignments:
                 assignments[j_] = []
             assignments[j_].append(i_)
@@ -145,7 +145,6 @@ for sidx, sol in enumerate(sols):
 for report in solution_reports:
     print(f"\n--- Solution #{report['solution_number']} ---")
     print("Facilities opened:", report['facilities'])
-
     print("Assignments:")
     for fac, pus in report['assignments'].items():
         print(f"  Facility {fac} <-- Planning Units {pus}")
@@ -163,22 +162,18 @@ for report in solution_reports:
     for fac, count in student_counts.items():
         print(f"  Facility {fac}: {count} students")
 
-
 pu_new = pu.copy()
 
 for solution in solution_reports: 
     facility_to_pus = solution['assignments']
-
     pu_to_facility = {
         pu_id: facility
         for facility, pu_list in facility_to_pus.items()
         for pu_id in pu_list
     }
-
     pu_new['assignment'] = pu.index.map(pu_to_facility)
     solution_number = solution['solution_number']
     pu_new.to_file(f"CFLP_hs_halfSGR_v2{solution_number}.geojson", driver="GeoJSON")
-
 
 with open('CFLP_hs_halfSGR_v2.json', 'w') as f:
     json.dump(solution_reports, f)
